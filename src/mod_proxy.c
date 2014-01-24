@@ -1411,6 +1411,32 @@ TRIGGER_FUNC(mod_proxy_trigger) {
 
 					host->is_disabled = 0;
 				}
+
+				/*
+				 * Brownout control loop
+				 */
+				if (p->conf.balance == PROXY_BALANCE_BROWNOUT) {
+					log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop START");
+
+					/* TODO: actual control algorithm */
+					for (n = 0; n < extension->value->used; n++) {
+						data_proxy *host = (data_proxy *)extension->value->data[n];
+						host->weight = 100;
+					}
+
+					/* Debug log */
+					for (n = 0; n < extension->value->used; n++) {
+						data_proxy *host = (data_proxy *)extension->value->data[n];
+
+						log_error_write(srv, __FILE__, __LINE__,  "sbdsdsdsd", "server: ",
+							host->host, host->port,
+							"lastTheta:", host->lastTheta,
+							"lastLastTheta:", host->lastLastTheta,
+							"weight:", host->weight);
+					}
+
+					log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop END");
+				}
 			}
 		}
 	}
