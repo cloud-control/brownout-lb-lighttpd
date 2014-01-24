@@ -1308,11 +1308,17 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 		/* Calculate the sum of weights */
 		for (k = 0; k < extension->value->used; k++) {
 			data_proxy *host = (data_proxy *)extension->value->data[k];
-			if (!host->is_disabled) break;
+			if (host->is_disabled) break;
 
 			if (host->weight == 0)
 				host->weight = 10000 / extension->value->used;
 			sum_of_weights += host->weight;
+		}
+
+		/* No active host found */
+		if (sum_of_weights == 0) {
+			ndx = -1;
+			break; /* out of switch */
 		}
 
 		int random_weight = rand() % sum_of_weights;
@@ -1320,7 +1326,7 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 		/* Find a random host considering weights */
 		for (ndx = 0; ndx < (int) extension->value->used; ndx++) {
 			data_proxy *host = (data_proxy *)extension->value->data[ndx];
-			if (!host->is_disabled) break;
+			if (host->is_disabled) break;
 
 			random_weight -= host->weight;
 			if (random_weight <= 0)
