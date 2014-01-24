@@ -308,7 +308,8 @@ mod_mysql_vhost_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(AM_CFLAGS) $(CFLAGS) $(mod_mysql_vhost_la_LDFLAGS) \
 	$(LDFLAGS) -o $@
-mod_proxy_la_DEPENDENCIES = $(am__DEPENDENCIES_2)
+mod_proxy_la_DEPENDENCIES = $(am__DEPENDENCIES_2) \
+	$(am__DEPENDENCIES_1)
 am_mod_proxy_la_OBJECTS = mod_proxy.lo
 mod_proxy_la_OBJECTS = $(am_mod_proxy_la_OBJECTS)
 mod_proxy_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
@@ -612,6 +613,7 @@ LDAP_LIB = @LDAP_LIB@
 LDFLAGS = @LDFLAGS@
 LIBEV_CFLAGS = @LIBEV_CFLAGS@
 LIBEV_LIBS = @LIBEV_LIBS@
+LIBM = @LIBM@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -822,7 +824,7 @@ mod_usertrack_la_LDFLAGS = -module -export-dynamic -avoid-version
 mod_usertrack_la_LIBADD = $(common_libadd)
 mod_proxy_la_SOURCES = mod_proxy.c
 mod_proxy_la_LDFLAGS = -module -export-dynamic -avoid-version
-mod_proxy_la_LIBADD = $(common_libadd)
+mod_proxy_la_LIBADD = $(common_libadd) $(LIBM)
 mod_ssi_la_SOURCES = mod_ssi_exprparser.c mod_ssi_expr.c mod_ssi.c
 mod_ssi_la_LDFLAGS = -module -export-dynamic -avoid-version
 mod_ssi_la_LIBADD = $(common_libadd) $(PCRE_LIB)
