@@ -615,6 +615,13 @@ static int proxy_response_parse(server *srv, connection *con, plugin_data *p, bu
 			if (0 == strncasecmp(key, "Location", key_len)) {
 				con->parsed_response |= HTTP_LOCATION;
 			}
+			else if (0 == strncasecmp(key, "X-Dimmer", key_len)) {
+				handler_ctx *hctx = con->plugin_ctx[p->id];
+				data_proxy *host = hctx->host;
+
+				host->lastLastTheta = host->lastTheta;
+				host->lastTheta = strtol(value, NULL, 10);
+			}
 			break;
 		case 10:
 			if (0 == strncasecmp(key, "Connection", key_len)) {
