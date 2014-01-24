@@ -1312,7 +1312,7 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 		int random_weight = rand() * sum_of_weights / RAND_MAX;
 
 		/* Find a random host considering weights */
-		for (ndx = 0; ndx < extension->value->used; ndx++) {
+		for (ndx = 0; ndx < (int) extension->value->used; ndx++) {
 			data_proxy *host = (data_proxy *)extension->value->data[ndx];
 			random_weight -= host->weight;
 			if (random_weight < 0)
