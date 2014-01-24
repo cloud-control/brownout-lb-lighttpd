@@ -155,6 +155,11 @@ typedef struct {
 
 	int usage; /* fair-balancing needs the no. of connections active on this host */
 	int last_used_ndx; /* round robin */
+
+	/* brownout */
+	int lastLastTheta; /* 0 to 10000 */
+	int lastTheta; /* 0 to 10000 */
+	int weight; /* 0 to 10000 */
 } data_fastcgi;
 
 data_fastcgi *data_fastcgi_init(void);
