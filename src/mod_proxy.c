@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
+#include <math.h>
 
 #include <stdio.h>
 
@@ -620,7 +621,7 @@ static int proxy_response_parse(server *srv, connection *con, plugin_data *p, bu
 				data_proxy *host = hctx->host;
 
 				host->lastLastTheta = host->lastTheta;
-				host->lastTheta = strtol(value, NULL, 10);
+				host->lastTheta = strtof(value, NULL);
 			}
 			break;
 		case 10:
@@ -1398,29 +1399,22 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 			
 	float Kp = 0.5;
 	float Ti = 1.0;
-	float lastThetas[numReplicas];
-	float lastLastThetas[numReplicas];
-	float weights[numReplicas];
 	float preNormalizedSumOfWeights = 0;
 
-	/* "Convert" from int to float */
-	for (i = 0; i < numReplicas; i++) {
-		data_proxy *host = (data_proxy *)extension->value->data[i];
-		lastThetas[i] = (float)host->lastTheta / 10000.0f;
-		lastLastThetas[i] = (float)host->lastLastTheta / 10000.0f;
-	}
-
 	/* Do control stuff */
-	for (i = 0; i < numReplicas; i++) {
-		weights[i] = fmaxf(weights[i] * (1 + Kp * (lastThetas[i] - lastLastThetas[i]) +
-			(Kp/Ti) * lastThetas[i]), 0.01);
-		preNormalizedSumOfWeights += weights[i];
-	}
-
-	/* "Convert" back to int */
+	/* NOTE: To avoid using floats when deciding what replica to choose next,
+	 * host->weight is normalized to 10000 */
 	for (i = 0; i < numReplicas; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
-		host->weight = weights[i] * 10000;
+		float lastTheta = host->lastTheta;
+		float lastLastTheta = host->lastLastTheta;
+		float weight = (float)host->weight / 10000;
+
+		weight = fmaxf(weight * (1 + Kp * (lastTheta - lastLastTheta) +
+			(Kp/Ti) * lastTheta), 0.01);
+		preNormalizedSumOfWeights += weight;
+
+		host->weight = weight * 10000;
 	}
 
 	/* Debug log */
@@ -1429,8 +1423,8 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 
 		log_error_write(srv, __FILE__, __LINE__,  "sbdsdsdsd", "server: ",
 			host->host, host->port,
-			"lastTheta:", host->lastTheta,
-			"lastLastTheta:", host->lastLastTheta,
+			"lastTheta:", (int)(host->lastTheta * 10000),
+			"lastLastTheta:", (int)(host->lastLastTheta * 10000),
 			"weight:", host->weight);
 	}
 
