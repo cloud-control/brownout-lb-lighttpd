@@ -1379,6 +1379,66 @@ static handler_t mod_proxy_connection_close_callback(server *srv, connection *co
 
 /**
  *
+ * re-compute weights based on recorded dimmer values
+ */
+static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
+	log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop START");
+
+	int numReplicas = (int) extension->value->used;
+	int i;
+
+	/* We are here trying to implement the following python code:
+			Kp = 0.5 # 1
+			Ti = 1.0 # 2.375
+			self.weights = [ max(x[0] * (1 + Kp * (x[1] - x[2]) + (Kp/Ti) * x[1]), 0.01) for x in \
+                            zip(self.weights, self.lastThetas, self.lastLastThetas) ]
+			preNormalizedSumOfWeights = sum(self.weights)
+			self.weights = [ x / preNormalizedSumOfWeights for x in self.weights ]
+	*/
+			
+	float Kp = 0.5;
+	float Ti = 1.0;
+	float lastThetas[numReplicas];
+	float lastLastThetas[numReplicas];
+	float weights[numReplicas];
+	float preNormalizedSumOfWeights = 0;
+
+	/* "Convert" from int to float */
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		lastThetas[i] = (float)host->lastTheta / 10000.0f;
+		lastLastThetas[i] = (float)host->lastLastTheta / 10000.0f;
+	}
+
+	/* Do control stuff */
+	for (i = 0; i < numReplicas; i++) {
+		weights[i] = fmaxf(weights[i] * (1 + Kp * (lastThetas[i] - lastLastThetas[i]) +
+			(Kp/Ti) * lastThetas[i]), 0.01);
+		preNormalizedSumOfWeights += weights[i];
+	}
+
+	/* "Convert" back to int */
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		host->weight = weights[i] * 10000;
+	}
+
+	/* Debug log */
+	for (i = 0; i < (int) extension->value->used; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+
+		log_error_write(srv, __FILE__, __LINE__,  "sbdsdsdsd", "server: ",
+			host->host, host->port,
+			"lastTheta:", host->lastTheta,
+			"lastLastTheta:", host->lastLastTheta,
+			"weight:", host->weight);
+	}
+
+	log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop END");
+}
+
+/**
+ *
  * the trigger re-enables the disabled connections after the timeout is over
  *
  * */
@@ -1415,28 +1475,8 @@ TRIGGER_FUNC(mod_proxy_trigger) {
 				/*
 				 * Brownout control loop
 				 */
-				if (p->conf.balance == PROXY_BALANCE_BROWNOUT) {
-					log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop START");
-
-					/* TODO: actual control algorithm */
-					for (n = 0; n < extension->value->used; n++) {
-						data_proxy *host = (data_proxy *)extension->value->data[n];
-						host->weight = 100;
-					}
-
-					/* Debug log */
-					for (n = 0; n < extension->value->used; n++) {
-						data_proxy *host = (data_proxy *)extension->value->data[n];
-
-						log_error_write(srv, __FILE__, __LINE__,  "sbdsdsdsd", "server: ",
-							host->host, host->port,
-							"lastTheta:", host->lastTheta,
-							"lastLastTheta:", host->lastLastTheta,
-							"weight:", host->weight);
-					}
-
-					log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop END");
-				}
+				if (p->conf.balance == PROXY_BALANCE_BROWNOUT)
+					mod_proxy_do_brownout_control(srv, extension);
 			}
 		}
 	}
