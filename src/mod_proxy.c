@@ -1289,14 +1289,28 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 		break;
 	}
 	case PROXY_BALANCE_BROWNOUT: {
+		int sum_of_weights = 0;
+
 		if (p->conf.debug) {
 			log_error_write(srv, __FILE__, __LINE__,  "s",
 					"proxy - used brownout balancing");
 		}
 
-		// TODO: NOT IMPLEMENTED
-		// Input: extension->value->data
-		// Output: ndx
+		/* Calculate the sum of weights */
+		for (k = 0; k < extension->value->used; k++) {
+			data_proxy *host = (data_proxy *)extension->value->data[k];
+			sum_of_weights += host->weight;
+		}
+
+		int random_weight = rand() * sum_of_weights / RAND_MAX;
+
+		/* Find a random host considering weights */
+		for (ndx = 0; ndx < extension->value->used; ndx++) {
+			data_proxy *host = (data_proxy *)extension->value->data[ndx];
+			random_weight -= host->weight;
+			if (random_weight < 0)
+				break;
+		}
 
 		break;
 	}
