@@ -1307,18 +1307,21 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 		/* Calculate the sum of weights */
 		for (k = 0; k < extension->value->used; k++) {
 			data_proxy *host = (data_proxy *)extension->value->data[k];
+			if (host->weight == 0)
+				host->weight = 10000 / extension->value->used;
 			sum_of_weights += host->weight;
 		}
 
-		int random_weight = rand() * sum_of_weights / RAND_MAX;
+		int random_weight = rand() % sum_of_weights;
 
 		/* Find a random host considering weights */
 		for (ndx = 0; ndx < (int) extension->value->used; ndx++) {
 			data_proxy *host = (data_proxy *)extension->value->data[ndx];
 			random_weight -= host->weight;
-			if (random_weight < 0)
+			if (random_weight <= 0)
 				break;
 		}
+		assert(random_weight <= 0);
 
 		break;
 	}
@@ -1400,6 +1403,7 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 	float Kp = 0.5;
 	float Ti = 1.0;
 	float preNormalizedSumOfWeights = 0;
+	float weights[numReplicas];
 
 	/* Do control stuff */
 	/* NOTE: To avoid using floats when deciding what replica to choose next,
@@ -1408,24 +1412,28 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
 		float lastTheta = host->lastTheta;
 		float lastLastTheta = host->lastLastTheta;
-		float weight = (float)host->weight / 10000;
+		weights[i] = (float)host->weight / 10000;
 
-		weight = fmaxf(weight * (1 + Kp * (lastTheta - lastLastTheta) +
+		weights[i] = fmaxf(weights[i] * (1 + Kp * (lastTheta - lastLastTheta) +
 			(Kp/Ti) * lastTheta), 0.01);
-		preNormalizedSumOfWeights += weight;
+		preNormalizedSumOfWeights += weights[i];
+	}
 
-		host->weight = weight * 10000;
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+
+		host->weight = weights[i] / preNormalizedSumOfWeights * 10000;
 	}
 
 	/* Debug log */
 	for (i = 0; i < (int) extension->value->used; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
 
-		log_error_write(srv, __FILE__, __LINE__,  "sbdsdsdsd", "server: ",
-			host->host, host->port,
-			"lastTheta:", (int)(host->lastTheta * 10000),
-			"lastLastTheta:", (int)(host->lastLastTheta * 10000),
-			"weight:", host->weight);
+		log_error_write(srv, __FILE__, __LINE__,  "sdsdsdb",
+			"lt:", (int)(host->lastTheta * 10000),
+			"ltt:", (int)(host->lastLastTheta * 10000),
+			"w:", host->weight,
+			host->host);
 	}
 
 	log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop END");
