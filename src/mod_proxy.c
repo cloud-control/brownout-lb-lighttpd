@@ -58,7 +58,8 @@ typedef enum {
 	PROXY_BALANCE_UNSET,
 	PROXY_BALANCE_FAIR,
 	PROXY_BALANCE_HASH,
-	PROXY_BALANCE_RR
+	PROXY_BALANCE_RR,
+	PROXY_BALANCE_BROWNOUT,
 } proxy_balance_t;
 
 typedef struct {
@@ -225,9 +226,11 @@ SETDEFAULTS_FUNC(mod_proxy_set_defaults) {
 			s->balance = PROXY_BALANCE_RR;
 		} else if (buffer_is_equal_string(p->balance_buf, CONST_STR_LEN("hash"))) {
 			s->balance = PROXY_BALANCE_HASH;
+		} else if (buffer_is_equal_string(p->balance_buf, CONST_STR_LEN("brownout"))) {
+			s->balance = PROXY_BALANCE_BROWNOUT;
 		} else {
 			log_error_write(srv, __FILE__, __LINE__, "sb",
-				        "proxy.balance has to be one of: fair, round-robin, hash, but not:", p->balance_buf);
+				        "proxy.balance has to be one of: fair, round-robin, hash, brownout, but not:", p->balance_buf);
 			return HANDLER_ERROR;
 		}
 
@@ -1282,6 +1285,18 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 
 		/* Save new index for next round */
 		((data_proxy *)extension->value->data[0])->last_used_ndx = ndx;
+
+		break;
+	}
+	case PROXY_BALANCE_BROWNOUT: {
+		if (p->conf.debug) {
+			log_error_write(srv, __FILE__, __LINE__,  "s",
+					"proxy - used brownout balancing");
+		}
+
+		// TODO: NOT IMPLEMENTED
+		// Input: extension->value->data
+		// Output: ndx
 
 		break;
 	}
