@@ -830,6 +830,7 @@ static handler_t proxy_write_request(server *srv, handler_ctx *hctx) {
 		/* fall through */
 
 	case PROXY_STATE_PREPARE_WRITE:
+		host->numRequestsSinceLastControl++;
 		proxy_create_env(srv, hctx);
 
 		proxy_set_state(srv, hctx, PROXY_STATE_WRITE);
@@ -1429,11 +1430,13 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 	for (i = 0; i < (int) extension->value->used; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
 
-		log_error_write(srv, __FILE__, __LINE__,  "sdsdsdb",
+		log_error_write(srv, __FILE__, __LINE__,  "sdsdsdsdb",
 			"lt:", (int)(host->lastTheta * 10000),
 			"ltt:", (int)(host->lastLastTheta * 10000),
 			"w:", host->weight,
+			"ew:", host->numRequestsSinceLastControl,
 			host->host);
+		host->numRequestsSinceLastControl = 0;
 	}
 
 	log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop END");
