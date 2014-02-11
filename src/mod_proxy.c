@@ -1446,9 +1446,33 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 			"w:", host->weight,
 			"ew:", host->numRequestsSinceLastControl,
 			host->host);
+	}
+	{
+		struct timeval timeval;
+		gettimeofday(&timeval, NULL);
+		fprintf(stderr, "%d.%06d,", (int)timeval.tv_sec, (int)timeval.tv_usec);
+	}
+	int numTotalRequestsSinceLastControl = 0;
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		fprintf(stderr, "%lf,", host->lastTheta);
+		numTotalRequestsSinceLastControl += host->numRequestsSinceLastControl;
+	}
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		fprintf(stderr, "%lf,", (double)host->weight / 10000);
+	}
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		fprintf(stderr, "%lf,", (double)host->numRequestsSinceLastControl / numTotalRequestsSinceLastControl);
+	}
+	fprintf(stderr, "\n");
+
+	/* Clean statistics */
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
 		host->numRequestsSinceLastControl = 0;
 	}
-
 	log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop END");
 }
 
