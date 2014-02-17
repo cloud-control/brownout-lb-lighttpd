@@ -758,7 +758,7 @@ static int proxy_demux_response(server *srv, handler_ctx *hctx) {
 			(double)(srv->cur_ts      - con->request_start);
 		data_proxy *host = hctx->host;
 		host->sumResponseTimeSinceLastControl += responseTime;
-		host->maxResponseTimeSinceLastControl = max(host->maxResponseTimeSinceLastControl, responseTime);
+		host->maxResponseTimeSinceLastControl = fmax(host->maxResponseTimeSinceLastControl, responseTime);
 
 		fin = 1;
 	}
@@ -1455,25 +1455,31 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 			"ew:", host->numRequestsSinceLastControl,
 			host->host);
 	}
-	{
-		struct timeval timeval;
-		gettimeofday(&timeval, NULL);
-		fprintf(stderr, "%d.%06d,", (int)timeval.tv_sec, (int)timeval.tv_usec);
-	}
+
+	// time, weights, dimmers, avg RTs, max RTs, num req (scalar), num req w/ optional (scalar), effective weights
+	// non-scalar values are vectors
+	double valuesToReport[numReplicas * 5 + 3];
+
 	int numTotalRequestsSinceLastControl = 0;
 	for (i = 0; i < numReplicas; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
-		fprintf(stderr, "%lf,", host->lastTheta);
 		numTotalRequestsSinceLastControl += host->numRequestsSinceLastControl;
 	}
+
 	for (i = 0; i < numReplicas; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
-		fprintf(stderr, "%lf,", (double)host->weight / 10000);
+		valuesToReport[0 * numReplicas + 1 + i] = host->weight;
+		valuesToReport[1 * numReplicas + 1 + i] = host->lastTheta;
+		valuesToReport[2 * numReplicas + 1 + i] = (double)host->sumResponseTimeSinceLastControl / host->numRequestsSinceLastControl;
+		valuesToReport[3 * numReplicas + 1 + i] = host->maxResponseTimeSinceLastControl;
+		// num req
+		// num req w/ optional
+		valuesToReport[4 * numReplicas + 3 + i] = (double)host->numRequestsSinceLastControl / numTotalRequestsSinceLastControl;
 	}
-	for (i = 0; i < numReplicas; i++) {
-		data_proxy *host = (data_proxy *)extension->value->data[i];
-		fprintf(stderr, "%lf,", (double)host->numRequestsSinceLastControl / numTotalRequestsSinceLastControl);
-	}
+	valuesToReport[0] = (double)srv->cur_ts_usec / 1000000.0 + srv->cur_ts;
+
+	for (i = 0; i < numReplicas * 5 + 3; i++)
+		fprintf(stderr, "%.06lf", valuesToReport[i]);
 	fprintf(stderr, "\n");
 
 	/* Clean statistics */
