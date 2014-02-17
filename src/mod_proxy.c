@@ -752,6 +752,14 @@ static int proxy_demux_response(server *srv, handler_ctx *hctx) {
 		http_chunk_append_mem(srv, con, NULL, 0);
 		joblist_append(srv, con);
 
+		/* Record response time */
+		double responseTime =
+			(double)(srv->cur_ts_usec - con->request_start_usec) / 1000000.0 +
+			(double)(srv->cur_ts      - con->request_start);
+		data_proxy *host = hctx->host;
+		host->sumResponseTimeSinceLastControl += responseTime;
+		host->maxResponseTimeSinceLastControl = max(host->maxResponseTimeSinceLastControl, responseTime);
+
 		fin = 1;
 	}
 
@@ -1472,6 +1480,8 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 	for (i = 0; i < numReplicas; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
 		host->numRequestsSinceLastControl = 0;
+		host->sumResponseTimeSinceLastControl = 0;
+		host->maxResponseTimeSinceLastControl = 0;
 	}
 	log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop END");
 }

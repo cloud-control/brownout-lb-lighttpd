@@ -161,6 +161,8 @@ typedef struct {
 	float lastTheta;
 	int weight;
 	int numRequestsSinceLastControl;
+	double sumResponseTimeSinceLastControl;
+	double maxResponseTimeSinceLastControl;
 } data_fastcgi;
 
 data_fastcgi *data_fastcgi_init(void);
