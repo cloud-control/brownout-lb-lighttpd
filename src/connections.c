@@ -1379,6 +1379,7 @@ int connection_state_machine(server *srv, connection *con) {
 			}
 
 			con->request_start = srv->cur_ts;
+			con->request_start_usec = srv->cur_ts_usec;
 			con->read_idle_ts = srv->cur_ts;
 
 			con->request_count++;

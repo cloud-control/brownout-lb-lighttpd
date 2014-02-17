@@ -363,6 +363,7 @@ typedef struct {
 
 	time_t connection_start;
 	time_t request_start;
+	suseconds_t request_start_usec;
 
 	struct timeval start_tv;
 
