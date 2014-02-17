@@ -1468,7 +1468,7 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 
 	for (i = 0; i < numReplicas; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
-		valuesToReport[0 * numReplicas + 1 + i] = host->weight;
+		valuesToReport[0 * numReplicas + 1 + i] = (double)host->weight / 10000.0;
 		valuesToReport[1 * numReplicas + 1 + i] = host->lastTheta;
 		valuesToReport[2 * numReplicas + 1 + i] = (double)host->sumResponseTimeSinceLastControl / host->numRequestsSinceLastControl;
 		valuesToReport[3 * numReplicas + 1 + i] = host->maxResponseTimeSinceLastControl;
