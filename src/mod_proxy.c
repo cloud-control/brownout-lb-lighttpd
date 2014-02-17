@@ -754,8 +754,8 @@ static int proxy_demux_response(server *srv, handler_ctx *hctx) {
 
 		/* Record response time */
 		double responseTime =
-			(double)(srv->cur_ts_usec - con->request_start_usec) / 1000000.0 +
-			(double)(srv->cur_ts      - con->request_start);
+			(srv->cur_ts_usec - con->request_start_usec) / 1000000.0 +
+			(srv->cur_ts      - con->request_start);
 		data_proxy *host = hctx->host;
 		host->sumResponseTimeSinceLastControl += responseTime;
 		host->maxResponseTimeSinceLastControl = fmax(host->maxResponseTimeSinceLastControl, responseTime);
@@ -1477,6 +1477,7 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 		valuesToReport[4 * numReplicas + 3 + i] = (double)host->numRequestsSinceLastControl / numTotalRequestsSinceLastControl;
 	}
 	valuesToReport[0] = (double)srv->cur_ts_usec / 1000000.0 + srv->cur_ts;
+	valuesToReport[4 * numReplicas + 1] = numTotalRequestsSinceLastControl;
 
 	for (i = 0; i < numReplicas * 5 + 3; i++) {
 		if (i != 0) fprintf(stderr, ",");
