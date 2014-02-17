@@ -1478,8 +1478,10 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 	}
 	valuesToReport[0] = (double)srv->cur_ts_usec / 1000000.0 + srv->cur_ts;
 
-	for (i = 0; i < numReplicas * 5 + 3; i++)
+	for (i = 0; i < numReplicas * 5 + 3; i++) {
+		if (i != 0) fprintf(stderr, ",");
 		fprintf(stderr, "%.06lf", valuesToReport[i]);
+	}
 	fprintf(stderr, "\n");
 
 	/* Clean statistics */
