@@ -110,6 +110,9 @@ typedef struct {
 
 	connection *remote_conn;  /* dump pointer */
 	plugin_data *plugin_data; /* dump pointer */
+
+	time_t request_start;
+	useconds_t request_start_usec;
 } handler_ctx;
 
 
@@ -753,9 +756,11 @@ static int proxy_demux_response(server *srv, handler_ctx *hctx) {
 		joblist_append(srv, con);
 
 		/* Record response time */
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
 		double responseTime =
-			(srv->cur_ts_usec - con->request_start_usec) / 1000000.0 +
-			(srv->cur_ts      - con->request_start);
+			(tv.tv_usec - hctx->request_start_usec) / 1000000.0 +
+			(tv.tv_sec  - hctx->request_start);
 		data_proxy *host = hctx->host;
 		host->sumResponseTimeSinceLastControl += responseTime;
 		host->maxResponseTimeSinceLastControl = fmax(host->maxResponseTimeSinceLastControl, responseTime);
@@ -806,7 +811,7 @@ static handler_t proxy_write_request(server *srv, handler_ctx *hctx) {
 		hctx->fde_ndx = -1;
 
 		srv->cur_fds++;
-
+		
 		fdevent_register(srv->ev, hctx->fd, proxy_handle_fdevent, hctx);
 
 		if (-1 == fdevent_fcntl_set(srv->ev, hctx->fd)) {
@@ -839,6 +844,12 @@ static handler_t proxy_write_request(server *srv, handler_ctx *hctx) {
 
 	case PROXY_STATE_PREPARE_WRITE:
 		host->numRequestsSinceLastControl++;
+		{
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			hctx->request_start = tv.tv_sec;
+			hctx->request_start_usec = tv.tv_usec;
+		}
 		proxy_create_env(srv, hctx);
 
 		proxy_set_state(srv, hctx, PROXY_STATE_WRITE);
