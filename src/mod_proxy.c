@@ -637,6 +637,13 @@ static int proxy_response_parse(server *srv, connection *con, plugin_data *p, bu
 				con->response.content_length = strtol(value, NULL, 10);
 				con->parsed_response |= HTTP_CONTENT_LENGTH;
 			}
+			else if (0 == strncasecmp(key, "X-WithOptional", key_len)) {
+				handler_ctx *hctx = con->plugin_ctx[p->id];
+				data_proxy *host = hctx->host;
+
+				if (strtod(value, NULL) == 1)
+					host->numRequestsWithOptional++;
+			}
 			break;
 		default:
 			break;
@@ -844,6 +851,7 @@ static handler_t proxy_write_request(server *srv, handler_ctx *hctx) {
 
 	case PROXY_STATE_PREPARE_WRITE:
 		host->numRequestsSinceLastControl++;
+		host->numRequests++;
 		{
 			struct timeval tv;
 			gettimeofday(&tv, NULL);
@@ -1472,9 +1480,13 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 	double valuesToReport[numReplicas * 5 + 3];
 
 	int numTotalRequestsSinceLastControl = 0;
+	int numTotalRequests = 0;
+	int numTotalRequestsWithOptional = 0;
 	for (i = 0; i < numReplicas; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
 		numTotalRequestsSinceLastControl += host->numRequestsSinceLastControl;
+		numTotalRequests += host->numRequests;
+		numTotalRequestsWithOptional += host->numRequestsWithOptional;
 	}
 
 	for (i = 0; i < numReplicas; i++) {
@@ -1488,7 +1500,8 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 		valuesToReport[4 * numReplicas + 3 + i] = (double)host->numRequestsSinceLastControl / numTotalRequestsSinceLastControl;
 	}
 	valuesToReport[0] = (double)srv->cur_ts_usec / 1000000.0 + srv->cur_ts;
-	valuesToReport[4 * numReplicas + 1] = numTotalRequestsSinceLastControl;
+	valuesToReport[4 * numReplicas + 1] = numTotalRequests;
+	valuesToReport[4 * numReplicas + 2] = numTotalRequestsWithOptional;
 
 	for (i = 0; i < numReplicas * 5 + 3; i++) {
 		if (i != 0) fprintf(stderr, ",");

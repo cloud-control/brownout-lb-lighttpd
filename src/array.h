@@ -160,6 +160,8 @@ typedef struct {
 	float lastLastTheta;
 	float lastTheta;
 	int weight;
+	int numRequests;
+	int numRequestsWithOptional;
 	int numRequestsSinceLastControl;
 	double sumResponseTimeSinceLastControl;
 	double maxResponseTimeSinceLastControl;
