@@ -1532,9 +1532,9 @@ TRIGGER_FUNC(mod_proxy_trigger) {
 
 				/*
 				 * Brownout control loop
+				 * NOTE: Executed even if the brownout algorithms is not active, to gather stats
 				 */
-				if (p->conf.balance == PROXY_BALANCE_BROWNOUT)
-					mod_proxy_do_brownout_control(srv, extension);
+				mod_proxy_do_brownout_control(srv, extension);
 			}
 		}
 	}
