@@ -1420,7 +1420,7 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 	*/
 			
 	float Kp = 0.5;
-	float Ti = 1.0;
+	float Ti = 10.0;
 	float preNormalizedSumOfWeights = 0;
 	float weights[numReplicas];
 
