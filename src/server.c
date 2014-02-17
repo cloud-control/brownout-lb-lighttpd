@@ -1217,6 +1217,7 @@ int main (int argc, char **argv) {
 		int n;
 		size_t ndx;
 		time_t min_ts;
+		useconds_t min_ts_usec;
 
 		if (handle_sig_hup) {
 			handler_t r;
@@ -1262,7 +1263,10 @@ int main (int argc, char **argv) {
 #endif
 
 			/* get current time */
-			min_ts = time(NULL);
+			struct timeval tv;
+			gettimeofday(&tv, NULL);
+			min_ts = tv.tv_sec;
+			min_ts_usec = tv.tv_usec;
 
 			if (min_ts != srv->cur_ts) {
 				int cs = 0;
@@ -1282,6 +1286,7 @@ int main (int argc, char **argv) {
 
 				/* trigger waitpid */
 				srv->cur_ts = min_ts;
+				srv->cur_ts_usec = min_ts_usec;
 
 				/* cleanup stat-cache */
 				stat_cache_trigger_cleanup(srv);
