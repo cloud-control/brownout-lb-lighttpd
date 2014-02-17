@@ -599,6 +599,7 @@ typedef struct server {
 
 	/* Timestamps */
 	time_t cur_ts;
+	suseconds_t cur_ts_usec;
 	time_t last_generated_date_ts;
 	time_t last_generated_debug_ts;
 	time_t startup_ts;

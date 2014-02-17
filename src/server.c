@@ -226,7 +226,10 @@ static server *server_init(void) {
 	}
 	if (frandom) fclose(frandom);
 
-	srv->cur_ts = time(NULL);
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	srv->cur_ts = tv.tv_sec;
+	srv->cur_ts_usec = tv.tv_usec;
 	srv->startup_ts = srv->cur_ts;
 
 	srv->conns = calloc(1, sizeof(*srv->conns));
