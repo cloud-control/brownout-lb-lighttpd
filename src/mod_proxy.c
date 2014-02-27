@@ -1466,7 +1466,7 @@ static void mod_proxy_report(server *srv, data_array *extension) {
 	int numReplicas = (int) extension->value->used;
 	int i;
 
-	// time, weights, dimmers, avg RTs, max RTs, num req (scalar), num req w/ optional (scalar), effective weights
+	// time, queue length, dimmers, avg RTs, max RTs, num req (scalar), num req w/ optional (scalar), effective weights
 	// non-scalar values are vectors
 	double valuesToReport[numReplicas * 5 + 3];
 
@@ -1482,7 +1482,7 @@ static void mod_proxy_report(server *srv, data_array *extension) {
 
 	for (i = 0; i < numReplicas; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
-		valuesToReport[0 * numReplicas + 1 + i] = (double)host->weight / 10000.0;
+		valuesToReport[0 * numReplicas + 1 + i] = host->usage;
 		valuesToReport[1 * numReplicas + 1 + i] = host->lastTheta;
 		valuesToReport[2 * numReplicas + 1 + i] = (double)host->sumResponseTimeSinceLastControl / host->numRequestsSinceLastControl;
 		valuesToReport[3 * numReplicas + 1 + i] = host->maxResponseTimeSinceLastControl;
