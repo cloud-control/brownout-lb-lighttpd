@@ -79,6 +79,8 @@ typedef struct {
 	plugin_config **config_storage;
 
 	plugin_config conf;
+
+	struct timeval lastDecision;
 } plugin_data;
 
 typedef enum {
@@ -1325,41 +1327,78 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 		break;
 	}
 	case PROXY_BALANCE_BROWNOUT: {
-		int sum_of_weights = 0;
+		/* Here we try to implement the following Python code:
+			dt = self.sim.now - self.lastDecision
+			if dt > 1: dt = 1
+
+			for i in range(0,len(self.backends)):
+				# Gain
+				Kp = 0.25
+				Ti = 5.0
+				gammaTr = .01
+
+				# PI control law
+				e = self.lastThetas[i] - self.lastLastThetas[i]
+				self.queueOffsets[i] += (Kp * e + (Kp/Ti) * self.lastThetas[i]) * dt
+
+				# Anti-windup
+				self.queueOffsets[i] -= gammaTr * (self.queueOffsets[i] - self.queueLengths[i]) * dt
+				self.lastThetaErrors[i] = e
+
+			self.lastDecision = self.sim.now
+			
+			# choose replica with shortest (queue + queueOffset)
+			request.chosenBackendIndex = \
+				min(range(0, len(self.queueLengths)), \
+				key = lambda i: self.queueLengths[i]-self.queueOffsets[i])
+		*/
+		int numReplicas = (int) extension->value->used;
+		int i;
+		
+		float Kp = 0.25;
+		float Ti = 5.0;
+		float gammaTr = 0.01;
+
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		float dt = (now.tv_usec - p->lastDecision.tv_usec) / 1000000.0 +
+			(now.tv_sec - p->lastDecision.tv_sec);
+		p->lastDecision = now;
+		if (dt > 1) dt = 1;
+
+		/* Do control stuff */
+		for (i = 0; i < numReplicas; i++) {
+			data_proxy *host = (data_proxy *)extension->value->data[i];
+			float lastTheta = host->lastTheta;
+			float lastLastTheta = host->lastLastTheta;
+			int queueLength = host->usage;
+			float *pQueueOffset = &host->queueOffset;
+
+			// PI control law
+			float e = lastTheta - lastLastTheta;
+			*pQueueOffset += (Kp * e + (Kp/Ti) * lastTheta) * dt;
+
+			// Anti-windup
+			*pQueueOffset -= gammaTr * (*pQueueOffset - queueLength) * dt;
+		}
+
+		for (k = 0, ndx = -1, max_usage = INT_MAX; k < extension->value->used; k++) {
+			data_proxy *host = (data_proxy *)extension->value->data[k];
+
+			if (host->is_disabled) continue;
+
+			int effectiveUsage = host->usage - host->queueOffset;
+			if (effectiveUsage < max_usage) {
+				max_usage = effectiveUsage;
+
+				ndx = k;
+			}
+		}
 
 		if (p->conf.debug) {
 			log_error_write(srv, __FILE__, __LINE__,  "s",
 					"proxy - used brownout balancing");
 		}
-
-		/* Calculate the sum of weights */
-		for (k = 0; k < extension->value->used; k++) {
-			data_proxy *host = (data_proxy *)extension->value->data[k];
-			if (host->is_disabled) break;
-
-			if (host->weight == 0)
-				host->weight = 10000 / extension->value->used;
-			sum_of_weights += host->weight;
-		}
-
-		/* No active host found */
-		if (sum_of_weights == 0) {
-			ndx = -1;
-			break; /* out of switch */
-		}
-
-		int random_weight = rand() % sum_of_weights;
-
-		/* Find a random host considering weights */
-		for (ndx = 0; ndx < (int) extension->value->used; ndx++) {
-			data_proxy *host = (data_proxy *)extension->value->data[ndx];
-			if (host->is_disabled) break;
-
-			random_weight -= host->weight;
-			if (random_weight <= 0)
-				break;
-		}
-		assert(random_weight <= 0);
 
 		break;
 	}
@@ -1423,57 +1462,9 @@ static handler_t mod_proxy_connection_close_callback(server *srv, connection *co
  *
  * re-compute weights based on recorded dimmer values
  */
-static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
-	log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop START");
-
+static void mod_proxy_report(server *srv, data_array *extension) {
 	int numReplicas = (int) extension->value->used;
 	int i;
-
-	/* We are here trying to implement the following python code:
-			Kp = 0.5 # 1
-			Ti = 1.0 # 2.375
-			self.weights = [ max(x[0] * (1 + Kp * (x[1] - x[2]) + (Kp/Ti) * x[1]), 0.01) for x in \
-                            zip(self.weights, self.lastThetas, self.lastLastThetas) ]
-			preNormalizedSumOfWeights = sum(self.weights)
-			self.weights = [ x / preNormalizedSumOfWeights for x in self.weights ]
-	*/
-			
-	float Kp = 0.5;
-	float Ti = 10.0;
-	float preNormalizedSumOfWeights = 0;
-	float weights[numReplicas];
-
-	/* Do control stuff */
-	/* NOTE: To avoid using floats when deciding what replica to choose next,
-	 * host->weight is normalized to 10000 */
-	for (i = 0; i < numReplicas; i++) {
-		data_proxy *host = (data_proxy *)extension->value->data[i];
-		float lastTheta = host->lastTheta;
-		float lastLastTheta = host->lastLastTheta;
-		weights[i] = (float)host->weight / 10000;
-
-		weights[i] = fmaxf(weights[i] * (1 + Kp * (lastTheta - lastLastTheta) +
-			(Kp/Ti) * lastTheta), 0.01);
-		preNormalizedSumOfWeights += weights[i];
-	}
-
-	for (i = 0; i < numReplicas; i++) {
-		data_proxy *host = (data_proxy *)extension->value->data[i];
-
-		host->weight = weights[i] / preNormalizedSumOfWeights * 10000;
-	}
-
-	/* Debug log */
-	for (i = 0; i < (int) extension->value->used; i++) {
-		data_proxy *host = (data_proxy *)extension->value->data[i];
-
-		log_error_write(srv, __FILE__, __LINE__,  "sdsdsdsdb",
-			"lt:", (int)(host->lastTheta * 10000),
-			"ltt:", (int)(host->lastLastTheta * 10000),
-			"w:", host->weight,
-			"ew:", host->numRequestsSinceLastControl,
-			host->host);
-	}
 
 	// time, weights, dimmers, avg RTs, max RTs, num req (scalar), num req w/ optional (scalar), effective weights
 	// non-scalar values are vectors
@@ -1516,7 +1507,6 @@ static void mod_proxy_do_brownout_control(server *srv, data_array *extension) {
 		host->sumResponseTimeSinceLastControl = 0;
 		host->maxResponseTimeSinceLastControl = 0;
 	}
-	log_error_write(srv, __FILE__, __LINE__,  "s", "Brownout control loop END");
 }
 
 /**
@@ -1555,10 +1545,9 @@ TRIGGER_FUNC(mod_proxy_trigger) {
 				}
 
 				/*
-				 * Brownout control loop
-				 * NOTE: Executed even if the brownout algorithms is not active, to gather stats
+				 * Periodically report metrics
 				 */
-				mod_proxy_do_brownout_control(srv, extension);
+				mod_proxy_report(srv, extension);
 			}
 		}
 	}

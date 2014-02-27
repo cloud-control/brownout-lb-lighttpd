@@ -159,6 +159,7 @@ typedef struct {
 	/* brownout */
 	float lastLastTheta;
 	float lastTheta;
+	float queueOffset;
 	int weight;
 	int numRequests;
 	int numRequestsWithOptional;
