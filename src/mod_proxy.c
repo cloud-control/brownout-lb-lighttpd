@@ -1382,6 +1382,7 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 			*pQueueOffset -= gammaTr * (*pQueueOffset - queueLength) * dt;
 		}
 
+
 		for (k = 0, ndx = -1, max_usage = INT_MAX; k < extension->value->used; k++) {
 			data_proxy *host = (data_proxy *)extension->value->data[k];
 
@@ -1466,9 +1467,9 @@ static void mod_proxy_report(server *srv, data_array *extension) {
 	int numReplicas = (int) extension->value->used;
 	int i;
 
-	// time, queue length, dimmers, avg RTs, max RTs, num req (scalar), num req w/ optional (scalar), effective weights
+	// time, queue length, dimmers, avg RTs, max RTs, num req (scalar), num req w/ optional (scalar), effective weights, queue offsets
 	// non-scalar values are vectors
-	double valuesToReport[numReplicas * 5 + 3];
+	double valuesToReport[numReplicas * 6 + 3];
 
 	int numTotalRequestsSinceLastControl = 0;
 	int numTotalRequests = 0;
@@ -1489,6 +1490,7 @@ static void mod_proxy_report(server *srv, data_array *extension) {
 		// num req
 		// num req w/ optional
 		valuesToReport[4 * numReplicas + 3 + i] = (double)host->numRequestsSinceLastControl / numTotalRequestsSinceLastControl;
+		valuesToReport[5 * numReplicas + 3 + i] = host->queueOffset;
 	}
 	valuesToReport[0] = (double)srv->cur_ts_usec / 1000000.0 + srv->cur_ts;
 	valuesToReport[4 * numReplicas + 1] = numTotalRequests;
