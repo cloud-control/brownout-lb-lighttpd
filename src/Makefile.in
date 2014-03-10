@@ -310,7 +310,8 @@ mod_mysql_vhost_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(LDFLAGS) -o $@
 mod_proxy_la_DEPENDENCIES = $(am__DEPENDENCIES_2) \
 	$(am__DEPENDENCIES_1)
-am_mod_proxy_la_OBJECTS = mod_proxy.lo
+am_mod_proxy_la_OBJECTS = mod_proxy.lo mod_proxy_brownout_diff.lo \
+	mod_proxy_brownout_equal.lo
 mod_proxy_la_OBJECTS = $(am_mod_proxy_la_OBJECTS)
 mod_proxy_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -822,7 +823,7 @@ mod_rrdtool_la_LIBADD = $(common_libadd)
 mod_usertrack_la_SOURCES = mod_usertrack.c
 mod_usertrack_la_LDFLAGS = -module -export-dynamic -avoid-version
 mod_usertrack_la_LIBADD = $(common_libadd)
-mod_proxy_la_SOURCES = mod_proxy.c
+mod_proxy_la_SOURCES = mod_proxy.c mod_proxy_brownout_diff.c mod_proxy_brownout_equal.c
 mod_proxy_la_LDFLAGS = -module -export-dynamic -avoid-version
 mod_proxy_la_LIBADD = $(common_libadd) $(LIBM)
 mod_ssi_la_SOURCES = mod_ssi_exprparser.c mod_ssi_expr.c mod_ssi.c
@@ -1249,6 +1250,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mod_magnet_la-mod_magnet_cache.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mod_mysql_vhost_la-mod_mysql_vhost.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mod_proxy.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mod_proxy_brownout_diff.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mod_proxy_brownout_equal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mod_redirect.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mod_rewrite.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mod_rrdtool.Plo@am__quote@

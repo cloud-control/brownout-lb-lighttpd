@@ -186,7 +186,7 @@ mod_usertrack_la_LDFLAGS = -module -export-dynamic -avoid-version
 mod_usertrack_la_LIBADD = $(common_libadd)
 
 lib_LTLIBRARIES += mod_proxy.la
-mod_proxy_la_SOURCES = mod_proxy.c
+mod_proxy_la_SOURCES = mod_proxy.c mod_proxy_brownout_diff.c mod_proxy_brownout_equal.c
 mod_proxy_la_LDFLAGS = -module -export-dynamic -avoid-version
 mod_proxy_la_LIBADD = $(common_libadd) $(LIBM)
 

@@ -14,6 +14,9 @@
 #include "inet_ntop_cache.h"
 #include "crc32.h"
 
+#include "mod_proxy_brownout_diff.h"
+#include "mod_proxy_brownout_equal.h"
+
 #include <sys/types.h>
 
 #include <unistd.h>
@@ -60,7 +63,8 @@ typedef enum {
 	PROXY_BALANCE_FAIR,
 	PROXY_BALANCE_HASH,
 	PROXY_BALANCE_RR,
-	PROXY_BALANCE_BROWNOUT,
+	PROXY_BALANCE_BROWNOUT_DIFF,
+	PROXY_BALANCE_BROWNOUT_EQUAL,
 } proxy_balance_t;
 
 typedef struct {
@@ -232,11 +236,13 @@ SETDEFAULTS_FUNC(mod_proxy_set_defaults) {
 			s->balance = PROXY_BALANCE_RR;
 		} else if (buffer_is_equal_string(p->balance_buf, CONST_STR_LEN("hash"))) {
 			s->balance = PROXY_BALANCE_HASH;
-		} else if (buffer_is_equal_string(p->balance_buf, CONST_STR_LEN("brownout"))) {
-			s->balance = PROXY_BALANCE_BROWNOUT;
+		} else if (buffer_is_equal_string(p->balance_buf, CONST_STR_LEN("brownout-diff"))) {
+			s->balance = PROXY_BALANCE_BROWNOUT_DIFF;
+		} else if (buffer_is_equal_string(p->balance_buf, CONST_STR_LEN("brownout-equal"))) {
+			s->balance = PROXY_BALANCE_BROWNOUT_EQUAL;
 		} else {
 			log_error_write(srv, __FILE__, __LINE__, "sb",
-				        "proxy.balance has to be one of: fair, round-robin, hash, brownout, but not:", p->balance_buf);
+				        "proxy.balance has to be one of: fair, round-robin, hash, brownout-diff, brownout-equal, but not:", p->balance_buf);
 			return HANDLER_ERROR;
 		}
 
@@ -1326,62 +1332,24 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 
 		break;
 	}
-	case PROXY_BALANCE_BROWNOUT: {
-		/* Here we try to implement the following Python code:
-			dt = self.sim.now - self.lastDecision
-			if dt > 1: dt = 1
-
-			for i in range(0,len(self.backends)):
-				# Gain
-				Kp = 0.25
-				Ti = 5.0
-				gammaTr = .01
-
-				# PI control law
-				e = self.lastThetas[i] - self.lastLastThetas[i]
-				self.queueOffsets[i] += (Kp * e + (Kp/Ti) * self.lastThetas[i]) * dt
-
-				# Anti-windup
-				self.queueOffsets[i] -= gammaTr * (self.queueOffsets[i] - self.queueLengths[i]) * dt
-				self.lastThetaErrors[i] = e
-
-			self.lastDecision = self.sim.now
-			
-			# choose replica with shortest (queue + queueOffset)
-			request.chosenBackendIndex = \
-				min(range(0, len(self.queueLengths)), \
-				key = lambda i: self.queueLengths[i]-self.queueOffsets[i])
-		*/
-		int numReplicas = (int) extension->value->used;
-		int i;
-		
-		float Kp = 0.25;
-		float Ti = 5.0;
-		float gammaTr = 0.01;
-
+	case PROXY_BALANCE_BROWNOUT_DIFF:
+	case PROXY_BALANCE_BROWNOUT_EQUAL: {
+		/* Compute delta t */
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		float dt = (now.tv_usec - p->lastDecision.tv_usec) / 1000000.0 +
 			(now.tv_sec - p->lastDecision.tv_sec);
 		p->lastDecision = now;
-		if (dt > 1) dt = 1;
+		if (dt > 1)
+			dt = 1;
 
-		/* Do control stuff */
-		for (i = 0; i < numReplicas; i++) {
-			data_proxy *host = (data_proxy *)extension->value->data[i];
-			float lastTheta = host->lastTheta;
-			float lastLastTheta = host->lastLastTheta;
-			int queueLength = host->usage;
-			float *pQueueOffset = &host->queueOffset;
-
-			// PI control law
-			float e = lastTheta - lastLastTheta;
-			*pQueueOffset += (Kp * e + (Kp/Ti) * lastTheta) * dt;
-
-			// Anti-windup
-			*pQueueOffset -= gammaTr * (*pQueueOffset - queueLength) * dt;
+		if (p->conf.balance == PROXY_BALANCE_BROWNOUT_DIFF)
+			mod_proxy_brownout_diff_update_queue_offsets(extension, dt);
+		else if (p->conf.balance == PROXY_BALANCE_BROWNOUT_EQUAL)
+			mod_proxy_brownout_equal_update_queue_offsets(extension, dt);
+		else {
+			/* Should not get here */
 		}
-
 
 		for (k = 0, ndx = -1, max_usage = INT_MAX; k < extension->value->used; k++) {
 			data_proxy *host = (data_proxy *)extension->value->data[k];
