@@ -1334,6 +1334,8 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 	}
 	case PROXY_BALANCE_BROWNOUT_DIFF:
 	case PROXY_BALANCE_BROWNOUT_EQUAL: {
+		int count_empty, choice_empty;
+		
 		/* Compute delta t */
 		struct timeval now;
 		gettimeofday(&now, NULL);
@@ -1351,16 +1353,36 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 			/* Should not get here */
 		}
 
-		for (k = 0, ndx = -1, max_usage = INT_MAX; k < extension->value->used; k++) {
+		for (k = 0, ndx = -1, count_empty = 0, max_usage = INT_MAX; k < extension->value->used; k++) {
 			data_proxy *host = (data_proxy *)extension->value->data[k];
 
 			if (host->is_disabled) continue;
 
+			/* Count empty servers */
+			if (host->usage == 0) {
+				count_empty++;
+			}
+			
 			int effectiveUsage = host->usage - host->queueOffset;
 			if (effectiveUsage < max_usage) {
 				max_usage = effectiveUsage;
 
 				ndx = k;
+			}
+		}
+		
+		/* If we are using eq-fast and there are any empty servers, choose one of them at random */
+		if (count_empty > 0 && p->conf.balance == PROXY_BALANCE_BROWNOUT_EQUAL) {
+			choice_empty = rand() % count_empty;
+			
+			for (ndx = 0; ; ndx++) {
+				data_proxy *host = (data_proxy *)extension->value->data[ndx];
+				
+				if (host->usage == 0) {
+					if (choice_empty-- == 0) {
+						break;
+					}
+				}
 			}
 		}
 

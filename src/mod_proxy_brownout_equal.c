@@ -16,7 +16,7 @@ void mod_proxy_brownout_equal_update_queue_offsets(data_array *extension, float 
 			# Integrate the negative deviation from the average
 			self.queueOffsets[i] += gamma * e
 			# Anti-windup
-			self.queueOffsets[i] -= gammaTr * (self.queueOffsets[i] - self.queueLengths[i])
+			# self.queueOffsets[i] -= gammaTr * (self.queueOffsets[i] - self.queueLengths[i])
 			self.lastThetaErrors[i] = e
 		self.lastDecision = self.sim.now
 		
@@ -54,6 +54,7 @@ void mod_proxy_brownout_equal_update_queue_offsets(data_array *extension, float 
 		// Integrate the negative deviation from the average
 		*pQueueOffset += gamma * e;
 		// Anti-windup
-		*pQueueOffset -= gammaTr * (*pQueueOffset - queueLength);
+		// *pQueueOffset -= gammaTr * (*pQueueOffset - queueLength);
+		// Anti-windup removed. Not needed. Instead we use anti-starvation
 	}
 }
