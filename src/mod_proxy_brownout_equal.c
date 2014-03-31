@@ -2,6 +2,8 @@
 
 #define data_proxy data_fastcgi
 
+#define BROWNOUT_EQUAL_INTEGRATOR_GAIN		2.0
+
 void mod_proxy_brownout_equal_update_queue_offsets(data_array *extension, float dt) {
 	/* Here we try to implement the following Python code:
 		dt = self.sim.now - self.lastDecision
@@ -9,14 +11,11 @@ void mod_proxy_brownout_equal_update_queue_offsets(data_array *extension, float 
 		for i in range(0,len(self.backends)):
 			# Gain
 			gamma = .1 * dt
-			gammaTr = .01 * dt
 			
 			# Calculate the negative deviation from the average
 			e = self.lastThetas[i] - avg(self.lastThetas)
 			# Integrate the negative deviation from the average
 			self.queueOffsets[i] += gamma * e
-			# Anti-windup
-			# self.queueOffsets[i] -= gammaTr * (self.queueOffsets[i] - self.queueLengths[i])
 			self.lastThetaErrors[i] = e
 		self.lastDecision = self.sim.now
 		
@@ -28,8 +27,7 @@ void mod_proxy_brownout_equal_update_queue_offsets(data_array *extension, float 
 	int numReplicas = (int) extension->value->used;
 	int i;
 
-	float gamma = .1 * dt;
-	float gammaTr = .01 * dt;
+	float gamma = BROWNOUT_EQUAL_INTEGRATOR_GAIN * dt;
 
 	float avgTheta = 0;
 	/* Compute average of thetas */
@@ -53,8 +51,5 @@ void mod_proxy_brownout_equal_update_queue_offsets(data_array *extension, float 
 		float e = lastTheta - avgTheta;
 		// Integrate the negative deviation from the average
 		*pQueueOffset += gamma * e;
-		// Anti-windup
-		// *pQueueOffset -= gammaTr * (*pQueueOffset - queueLength);
-		// Anti-windup removed. Not needed. Instead we use anti-starvation
 	}
 }
