@@ -1377,6 +1377,8 @@ static handler_t mod_proxy_check_extension(server *srv, connection *con, void *p
 			
 			for (ndx = 0; ; ndx++) {
 				data_proxy *host = (data_proxy *)extension->value->data[ndx];
+
+				if (host->is_disabled) continue;
 				
 				if (host->usage == 0) {
 					if (choice_empty-- == 0) {
