@@ -1456,8 +1456,10 @@ static handler_t mod_proxy_connection_close_callback(server *srv, connection *co
  * re-compute weights based on recorded dimmer values
  */
 static void mod_proxy_report(server *srv, data_array *extension) {
+	static int firstReport = 1; // XXX: ugly
 	int numReplicas = (int) extension->value->used;
 	int i;
+	int valueIdx = 0;
 
 	// time, queue length, dimmers, avg RTs, max RTs, num req (scalar), num req w/ optional (scalar), effective weights, queue offsets
 	// non-scalar values are vectors
@@ -1473,22 +1475,56 @@ static void mod_proxy_report(server *srv, data_array *extension) {
 		numTotalRequestsWithOptional += host->numRequestsWithOptional;
 	}
 
+	valuesToReport[valueIdx++] = (double)srv->cur_ts_usec / 1000000.0 + srv->cur_ts;
+	if (firstReport) fprintf(stderr, "time,");
+
+	valuesToReport[valueIdx++] = numTotalRequests;
+	if (firstReport) fprintf(stderr, "accRequests,");
+
+	valuesToReport[valueIdx++] = numTotalRequestsWithOptional;
+	if (firstReport) fprintf(stderr, "accOption,");
+
 	for (i = 0; i < numReplicas; i++) {
 		data_proxy *host = (data_proxy *)extension->value->data[i];
-		valuesToReport[0 * numReplicas + 1 + i] = host->usage;
-		valuesToReport[1 * numReplicas + 1 + i] = host->lastTheta;
-		valuesToReport[2 * numReplicas + 1 + i] = (double)host->sumResponseTimeSinceLastControl / host->numRequestsSinceLastControl;
-		valuesToReport[3 * numReplicas + 1 + i] = host->maxResponseTimeSinceLastControl;
-		// num req
-		// num req w/ optional
-		valuesToReport[4 * numReplicas + 3 + i] = (double)host->numRequestsSinceLastControl / numTotalRequestsSinceLastControl;
-		valuesToReport[5 * numReplicas + 3 + i] = host->queueOffset;
+		if (firstReport) fprintf(stderr, "queueLength%d,", i);
+		valuesToReport[valueIdx++] = host->usage;
 	}
-	valuesToReport[0] = (double)srv->cur_ts_usec / 1000000.0 + srv->cur_ts;
-	valuesToReport[4 * numReplicas + 1] = numTotalRequests;
-	valuesToReport[4 * numReplicas + 2] = numTotalRequestsWithOptional;
 
-	for (i = 0; i < numReplicas * 5 + 3; i++) {
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		if (firstReport) fprintf(stderr, "theta%d,", i);
+		valuesToReport[valueIdx++] = host->lastTheta;
+	}
+
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		if (firstReport) fprintf(stderr, "avgRT%d,", i);
+		valuesToReport[valueIdx++] = (double)host->sumResponseTimeSinceLastControl / host->numRequestsSinceLastControl;
+	}
+
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		if (firstReport) fprintf(stderr, "maxRT%d,", i);
+		valuesToReport[valueIdx++] = host->maxResponseTimeSinceLastControl;
+	}
+
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		if (firstReport) fprintf(stderr, "option%d,", i);
+		valuesToReport[valueIdx++] = (double)host->numRequestsSinceLastControl / numTotalRequestsSinceLastControl;
+	}
+
+	for (i = 0; i < numReplicas; i++) {
+		data_proxy *host = (data_proxy *)extension->value->data[i];
+		if (firstReport) fprintf(stderr, "queueOffset%d,", i);
+		valuesToReport[valueIdx++] = host->queueOffset;
+	}
+
+	assert(valueIdx == numReplicas * 6 + 3);
+	if (firstReport) fprintf(stderr, "\n");
+	firstReport = 0;
+
+	for (i = 0; i < valueIdx; i++) {
 		if (i != 0) fprintf(stderr, ",");
 		fprintf(stderr, "%.06lf", valuesToReport[i]);
 	}
