@@ -28,7 +28,7 @@ void mod_proxy_brownout_equal_update_queue_offsets(data_array *extension, float 
 	int numReplicas = (int) extension->value->used;
 	int i;
 
-	float gamma = .1 * dt;
+	float gamma = .2 * dt;
 	float gammaTr = .01 * dt;
 
 	float avgTheta = 0;
