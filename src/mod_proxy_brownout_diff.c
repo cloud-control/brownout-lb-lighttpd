@@ -32,7 +32,7 @@ void mod_proxy_brownout_diff_update_queue_offsets(data_array *extension, float d
 	int i;
 
 	float Kp = 1.0;
-	float Ti = 5.0;
+	float Ti = 2.0;
 	float gammaTr = 0.01;
 
 	/* Do control stuff */
