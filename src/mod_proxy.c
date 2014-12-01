@@ -84,6 +84,8 @@ typedef struct {
 
 	plugin_config conf;
 
+	int report_sock;
+
 	struct timeval lastDecision;
 } plugin_data;
 
@@ -161,6 +163,17 @@ INIT_FUNC(mod_proxy_init) {
 	p->parse_response = buffer_init();
 	p->balance_buf = buffer_init();
 
+	p->report_sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+	struct sockaddr_in sa;
+	memset(&sa, 0, sizeof(struct sockaddr_in));
+	sa.sin_family = AF_INET;
+	sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	sa.sin_port = htons(2712);
+	if (connect(p->report_sock, (struct sockaddr *)&sa,
+		sizeof(struct sockaddr_in)) == -1)
+		fprintf(stderr, "Unable to connect reporting socket\n");
+
 	return p;
 }
 
@@ -188,6 +201,7 @@ FREE_FUNC(mod_proxy_free) {
 		free(p->config_storage);
 	}
 
+	close(p->report_sock);
 	free(p);
 
 	return HANDLER_GO_ON;
@@ -780,6 +794,11 @@ static int proxy_demux_response(server *srv, handler_ctx *hctx) {
 		host->sumResponseTimeSinceLastControl += responseTime;
 		host->maxResponseTimeSinceLastControl = fmax(host->maxResponseTimeSinceLastControl, responseTime);
 
+		char buf[64];
+		int buflen = snprintf(buf, 64, "%f", responseTime);
+		if (write(p->report_sock, buf, buflen) != buflen)
+			fprintf(stderr, "Unable to report RT\n");
+
 		fin = 1;
 	}
 
@@ -865,6 +884,8 @@ static handler_t proxy_write_request(server *srv, handler_ctx *hctx) {
 			gettimeofday(&tv, NULL);
 			hctx->request_start = tv.tv_sec;
 			hctx->request_start_usec = tv.tv_usec;
+			if (write(hctx->plugin_data->report_sock, "START", 5) != 5)
+				fprintf(stderr, "Could not report START\n");
 		}
 		proxy_create_env(srv, hctx);
 
